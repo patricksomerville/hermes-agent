@@ -1483,9 +1483,26 @@ class GatewayRunner:
 
         self._busy_ack_ts[session_key] = now
 
-        # Build a status-rich acknowledgment
+        # Build a status-rich acknowledgment unless this platform is configured
+        # for quiet busy acks. This keeps messaging apps from surfacing
+        # iteration/tool details in routine queued/interrupted messages.
+        show_busy_status_detail = True
+        try:
+            from gateway.display_config import resolve_display_setting
+            show_busy_status_detail = is_truthy_value(
+                resolve_display_setting(
+                    _load_gateway_config(),
+                    _platform_config_key(event.source.platform),
+                    "busy_status_detail",
+                    True,
+                ),
+                default=True,
+            )
+        except Exception:
+            show_busy_status_detail = True
+
         status_parts = []
-        if running_agent and running_agent is not _AGENT_PENDING_SENTINEL:
+        if show_busy_status_detail and running_agent and running_agent is not _AGENT_PENDING_SENTINEL:
             try:
                 summary = running_agent.get_activity_summary()
                 iteration = summary.get("api_call_count", 0)
@@ -9244,7 +9261,12 @@ class GatewayRunner:
         interim_assistant_messages_enabled = (
             source.platform != Platform.WEBHOOK
             and is_truthy_value(
-                display_config.get("interim_assistant_messages"),
+                resolve_display_setting(
+                    user_config,
+                    platform_key,
+                    "interim_assistant_messages",
+                    True,
+                ),
                 default=True,
             )
         )
