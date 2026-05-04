@@ -50,6 +50,7 @@ Example config::
 Features:
     - Stdio transport (command + args) and HTTP/StreamableHTTP transport (url)
     - SSE transport (transport: sse) for MCP servers using the SSE protocol
+    - Optional ``fallback_urls`` list for resilient HTTP MCP endpoints
     - Automatic reconnection with exponential backoff (up to 5 retries)
     - Environment variable filtering for stdio subprocesses (security)
     - Credential stripping in error messages returned to the LLM
@@ -2534,13 +2535,60 @@ def _interpolate_env_vars(value):
     return value
 
 
+def _coerce_url_list(value: Any) -> List[str]:
+    """Normalize a config value into a list of non-empty URL strings."""
+    if not value:
+        return []
+    if isinstance(value, str):
+        value = [value]
+    if not isinstance(value, list):
+        return []
+    return [str(item).strip() for item in value if str(item).strip()]
+
+
+def _dedupe_preserve_order(items: List[str]) -> List[str]:
+    """Return *items* without duplicates, preserving the first occurrence."""
+    seen = set()
+    result: List[str] = []
+    for item in items:
+        if item in seen:
+            continue
+        seen.add(item)
+        result.append(item)
+    return result
+
+
+def _http_candidate_configs(config: dict) -> List[dict]:
+    """Expand one HTTP MCP config into ordered candidate configs."""
+    if "url" not in config:
+        return [config]
+
+    primary = str(config.get("url") or "").strip()
+    fallbacks = _coerce_url_list(config.get("fallback_urls"))
+    ordered_urls = _dedupe_preserve_order(
+        [url for url in ([primary] + fallbacks) if url]
+    )
+    if not ordered_urls:
+        return [config]
+
+    candidates: List[dict] = []
+    for url in ordered_urls:
+        candidate = dict(config)
+        candidate["url"] = url
+        candidate.pop("fallback_urls", None)
+        candidates.append(candidate)
+    return candidates
+
+
 def _load_mcp_config() -> Dict[str, dict]:
     """Read ``mcp_servers`` from the Hermes config file.
 
     Returns a dict of ``{server_name: server_config}`` or empty dict.
     Server config can contain either ``command``/``args``/``env`` for stdio
     transport or ``url``/``headers`` for HTTP transport, plus optional
-    ``timeout``, ``connect_timeout``, and ``auth`` overrides.
+    ``timeout``, ``connect_timeout``, ``auth``, and ``fallback_urls`` overrides.
+    ``fallback_urls`` is a list of alternative URLs tried in order if the
+    primary ``url`` fails to connect.
 
     ``${ENV_VAR}`` placeholders in string values are resolved from
     ``os.environ`` (which includes ``~/.hermes/.env`` loaded at startup).
@@ -2578,9 +2626,44 @@ async def _connect_server(name: str, config: dict) -> MCPServerTask:
         ImportError: if HTTP transport is needed but not available.
         Exception: on connection or initialization failure.
     """
-    server = MCPServerTask(name)
-    await server.start(config)
-    return server
+    candidate_configs = _http_candidate_configs(config)
+    errors: List[str] = []
+    last_exc: Optional[Exception] = None
+
+    for index, candidate in enumerate(candidate_configs, start=1):
+        server = MCPServerTask(name)
+        try:
+            await server.start(candidate)
+            if index > 1:
+                logger.info(
+                    "MCP server '%s' connected via fallback URL %s",
+                    name, candidate.get("url"),
+                )
+            return server
+        except Exception as exc:
+            last_exc = exc
+            if "url" in candidate:
+                errors.append(
+                    f"{candidate.get('url')}: {_format_connect_error(exc)}"
+                )
+                if index < len(candidate_configs):
+                    logger.warning(
+                        "MCP server '%s' failed at %s, trying fallback (%d/%d)",
+                        name,
+                        candidate.get("url"),
+                        index,
+                        len(candidate_configs),
+                    )
+            else:
+                errors.append(_format_connect_error(exc))
+
+    if len(errors) > 1:
+        raise RuntimeError(
+            f"MCP server '{name}' failed across candidate URLs: {' | '.join(errors)}"
+        )
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError(f"MCP server '{name}' failed to connect")
 
 
 # ---------------------------------------------------------------------------

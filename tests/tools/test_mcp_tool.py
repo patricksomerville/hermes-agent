@@ -3985,3 +3985,27 @@ class TestMcpParallelToolCalls:
             register_mcp_servers(config_off)
         with _lock:
             assert sanitize_mcp_name_component("toggle_srv") not in _parallel_safe_servers
+
+
+class TestConnectServerFallbacks:
+    """Verify HTTP fallback URL handling in _connect_server()."""
+
+    def test_tries_fallback_url_after_primary_failure(self):
+        from tools.mcp_tool import MCPServerTask, _connect_server
+
+        PRIMARY = "http://127.0.0.1:33010/mcp"
+        FALLBACK = "http://neon:3000/mcp"
+
+        async def fake_start(self, cfg):
+            self._config = cfg
+            if cfg.get("url") == PRIMARY:
+                raise RuntimeError("primary unavailable")
+            self.session = object()
+
+        with patch.object(MCPServerTask, "start", new=fake_start):
+            server = asyncio.run(_connect_server("bop-gun", {
+                "url": PRIMARY,
+                "fallback_urls": [FALLBACK],
+            }))
+
+        assert server._config["url"] == FALLBACK

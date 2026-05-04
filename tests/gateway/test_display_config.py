@@ -163,6 +163,30 @@ class TestYAMLNormalisation:
         config = {"display": {"platforms": {"slack": {"tool_preview_length": "80"}}}}
         assert resolve_display_setting(config, "slack", "tool_preview_length") == 80
 
+    def test_quiet_boolean_platform_settings_string_false(self):
+        """String false works for quiet-mode booleans."""
+        from gateway.display_config import resolve_display_setting
+
+        config = {
+            "display": {
+                "platforms": {
+                    "telegram": {
+                        "interim_assistant_messages": "false",
+                        "busy_status_detail": "false",
+                    }
+                }
+            }
+        }
+        assert resolve_display_setting(config, "telegram", "interim_assistant_messages") is False
+        assert resolve_display_setting(config, "telegram", "busy_status_detail") is False
+
+    def test_quiet_boolean_defaults_true(self):
+        """Quiet-mode booleans default to the existing chatty behavior."""
+        from gateway.display_config import resolve_display_setting
+
+        assert resolve_display_setting({}, "telegram", "interim_assistant_messages") is True
+        assert resolve_display_setting({}, "telegram", "busy_status_detail") is True
+
     def test_platform_override_false_tool_progress(self):
         """Per-platform bare off → normalised."""
         from gateway.display_config import resolve_display_setting

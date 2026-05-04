@@ -172,6 +172,10 @@ def resolve_display_setting(
     plat_overrides = platforms.get(platform_key)
     if isinstance(plat_overrides, dict):
         val = plat_overrides.get(setting)
+        # Backward compat: Patrick/Somertime configs used busy_status_detail
+        # before upstream renamed the knob to busy_ack_detail.
+        if val is None and setting == "busy_ack_detail":
+            val = plat_overrides.get("busy_status_detail")
         if val is not None:
             return _normalise(setting, val)
 
@@ -224,6 +228,7 @@ def _normalise(setting: str, value: Any) -> Any:
         "interim_assistant_messages",
         "long_running_notifications",
         "busy_ack_detail",
+        "busy_status_detail",
     }:
         if isinstance(value, str):
             return value.lower() in {"true", "1", "yes", "on"}

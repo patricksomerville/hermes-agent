@@ -3430,14 +3430,19 @@ class GatewayRunner:
         # can be opted in per platform via display.platforms.<platform>.busy_ack_detail.
         from gateway.display_config import resolve_display_setting
         status_parts = []
-        busy_ack_detail_enabled = bool(
-            resolve_display_setting(
-                _load_gateway_config(),
-                _platform_config_key(event.source.platform),
-                "busy_ack_detail",
-                True,
+        busy_ack_detail_enabled = True
+        try:
+            busy_ack_detail_enabled = is_truthy_value(
+                resolve_display_setting(
+                    _load_gateway_config(),
+                    _platform_config_key(event.source.platform),
+                    "busy_ack_detail",
+                    True,
+                ),
+                default=True,
             )
-        )
+        except Exception:
+            busy_ack_detail_enabled = True
 
         if busy_ack_detail_enabled and running_agent and running_agent is not _AGENT_PENDING_SENTINEL:
             try:
@@ -16770,13 +16775,14 @@ class GatewayRunner:
         # in chat platforms while opting into concise mid-turn updates.
         interim_assistant_messages_enabled = (
             source.platform != Platform.WEBHOOK
-            and bool(
+            and is_truthy_value(
                 resolve_display_setting(
                     user_config,
                     platform_key,
                     "interim_assistant_messages",
                     True,
-                )
+                ),
+                default=True,
             )
         )
         
