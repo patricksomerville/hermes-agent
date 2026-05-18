@@ -749,6 +749,15 @@ def mcp_command(args):
         run_mcp_server(verbose=getattr(args, "verbose", False))
         return
 
+    if action in {"windows-bridge", "windows-server"}:
+        from hermes_cli.windows_mcp_bridge import run_windows_mcp_bridge
+        run_windows_mcp_bridge(
+            host=getattr(args, "host", "127.0.0.1"),
+            port=getattr(args, "port", 48779),
+            verbose=getattr(args, "verbose", False),
+        )
+        return
+
     handlers = {
         "add": cmd_mcp_add,
         "remove": cmd_mcp_remove,
@@ -769,6 +778,7 @@ def mcp_command(args):
         cmd_mcp_list()
         print(color("  Commands:", Colors.CYAN))
         _info("hermes mcp serve                              Run as MCP server")
+        _info("hermes mcp windows-bridge                    Run Windows host bridge over SSE")
         _info("hermes mcp add <name> --url <endpoint>        Add an MCP server")
         _info("hermes mcp add <name> --command <cmd>         Add a stdio server")
         _info("hermes mcp add <name> --preset <preset>       Add from a known preset")

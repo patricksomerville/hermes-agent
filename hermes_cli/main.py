@@ -11539,6 +11539,29 @@ Examples:
     )
     _add_accept_hooks_flag(mcp_serve_p)
 
+    mcp_windows_p = mcp_sub.add_parser(
+        "windows-bridge",
+        aliases=["windows-server"],
+        help="Run the Windows host MCP bridge over SSE",
+    )
+    mcp_windows_p.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Bind host for the SSE server (default: 127.0.0.1)",
+    )
+    mcp_windows_p.add_argument(
+        "--port",
+        type=int,
+        default=48779,
+        help="Bind port for the SSE server (default: 48779)",
+    )
+    mcp_windows_p.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Enable verbose logging on stderr",
+    )
+
     mcp_add_p = mcp_sub.add_parser(
         "add", help="Add an MCP server (discovery-first install)"
     )
