@@ -796,6 +796,14 @@ platform_toolsets:
 #     args: ["-y", "@modelcontextprotocol/server-github"]
 #     env:
 #       GITHUB_PERSONAL_ACCESS_TOKEN: "ghp_..."
+#   windows:
+#     # Run this on the Windows host first:
+#     #   hermes mcp windows-bridge --host 0.0.0.0 --port 48779
+#     # Then point WSL Hermes at the Windows host IP.
+#     url: "http://<windows-host-ip>:48779/sse"
+#     transport: sse
+#     connect_timeout: 10
+#     timeout: 120
 #
 # Sampling (server-initiated LLM requests) — enabled by default.
 # Per-server config under the 'sampling' key:

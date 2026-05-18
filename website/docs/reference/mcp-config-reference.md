@@ -23,6 +23,7 @@ mcp_servers:
 
     # OR
     url: "..."          # HTTP servers
+    transport: "sse"    # optional: use MCP SSE instead of Streamable HTTP
     headers: {}
 
     # Optional HTTP/SSE TLS settings:
@@ -49,6 +50,7 @@ mcp_servers:
 | `args` | list | stdio | Arguments for the subprocess |
 | `env` | mapping | stdio | Environment passed to the subprocess |
 | `url` | string | HTTP | Remote MCP endpoint |
+| `transport` | string | HTTP | Set to `sse` for MCP SSE endpoints |
 | `headers` | mapping | HTTP | Headers for remote server requests |
 | `ssl_verify` | bool or string | HTTP | TLS verification. `true` (default) uses system CAs, `false` disables verification (insecure), or a string path to a custom CA bundle (PEM) |
 | `client_cert` | string or list | HTTP | mTLS client certificate. String = path to a PEM file containing cert + key. List `[cert, key]` = separate files. List `[cert, key, password]` = encrypted key |
@@ -232,6 +234,25 @@ Notes:
 - Paths support `~` expansion. Missing files fail fast at connect time with a server-scoped error message.
 - `ssl_verify: false` disables server certificate verification entirely. Don't use this with real services.
 - Works on both Streamable HTTP and SSE transports.
+
+### Windows host bridge from WSL
+
+Run the server on Windows:
+
+```powershell
+hermes mcp windows-bridge --host 0.0.0.0 --port 48779
+```
+
+Configure the WSL-side Hermes client:
+
+```yaml
+mcp_servers:
+  windows:
+    url: "http://<windows-host-ip>:48779/sse"
+    transport: sse
+    connect_timeout: 10
+    timeout: 120
+```
 
 ## Reloading config
 

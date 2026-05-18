@@ -795,8 +795,6 @@ def mcp_command(args):
         run_mcp_server(verbose=getattr(args, "verbose", False))
         return
 
-    # Catalog subcommands live in mcp_picker / mcp_catalog. Import lazily so
-    # the original `mcp_config` module stays import-cheap.
     if action == "picker":
         from hermes_cli.mcp_picker import run_picker
         run_picker()
@@ -811,6 +809,15 @@ def mcp_command(args):
         rc = install_by_name(getattr(args, "identifier", "") or "")
         if rc:
             _sys.exit(rc)
+        return
+
+    if action in {"windows-bridge", "windows-server"}:
+        from hermes_cli.windows_mcp_bridge import run_windows_mcp_bridge
+        run_windows_mcp_bridge(
+            host=getattr(args, "host", "127.0.0.1"),
+            port=getattr(args, "port", 48779),
+            verbose=getattr(args, "verbose", False),
+        )
         return
 
     handlers = {
@@ -838,6 +845,7 @@ def mcp_command(args):
         _info("hermes mcp catalog                            List Nous-approved MCPs")
         _info("hermes mcp install <name>                     Install a catalog MCP")
         _info("hermes mcp serve                              Run as MCP server")
+        _info("hermes mcp windows-bridge                    Run Windows host bridge over SSE")
         _info("hermes mcp add <name> --url <endpoint>        Add a custom MCP server")
         _info("hermes mcp add <name> --command <cmd>         Add a stdio server")
         _info("hermes mcp add <name> --preset <preset>       Add from a known preset")

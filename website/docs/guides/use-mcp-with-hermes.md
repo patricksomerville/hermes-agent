@@ -178,6 +178,37 @@ Common reasons:
 
 In those cases, keep `/browser connect` for same-environment setups and use MCP for WSL-to-Windows browser bridging.
 
+## WSL2: Windows host command bridge over SSE
+
+Use this bridge when Hermes runs in WSL but the operation must happen on the Windows host: service management, firewall rules, registry values, scheduled tasks, or a one-off PowerShell/cmd command.
+
+Start the bridge on Windows:
+
+```powershell
+hermes mcp windows-bridge --host 0.0.0.0 --port 48779
+```
+
+Then configure the WSL-side `~/.hermes/config.yaml`:
+
+```yaml
+mcp_servers:
+  windows:
+    url: "http://<windows-host-ip>:48779/sse"
+    transport: sse
+    connect_timeout: 10
+    timeout: 120
+```
+
+The Windows bridge exposes:
+
+- `windows_exec`
+- `windows_service`
+- `windows_registry`
+- `windows_firewall`
+- `windows_schedule`
+
+The registered Hermes tool names use the normal MCP prefix, for example `mcp_windows_windows_exec` and `mcp_windows_windows_service`.
+
 ### Known pitfalls
 
 - Start Hermes from a Windows-mounted path like `/mnt/c/Users/<you>` or `/mnt/c/workspace/...` when using Windows stdio executables through MCP.

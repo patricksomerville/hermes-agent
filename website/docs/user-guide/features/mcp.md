@@ -257,6 +257,7 @@ Hermes reads MCP config from `~/.hermes/config.yaml` under `mcp_servers`.
 | `args` | list | Arguments for the stdio server |
 | `env` | mapping | Environment variables passed to the stdio server |
 | `url` | string | HTTP MCP endpoint |
+| `transport` | string | Set to `sse` for MCP SSE endpoints |
 | `headers` | mapping | HTTP headers for remote servers |
 | `timeout` | number | Tool call timeout |
 | `connect_timeout` | number | Initial connection timeout |

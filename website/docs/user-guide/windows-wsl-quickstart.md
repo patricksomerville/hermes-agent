@@ -209,6 +209,60 @@ Short version:
 
 For the full table (Ollama / LM Studio / vLLM / SGLang bind addresses, firewall rule one-liners, dynamic IP helpers, Hyper-V firewall workaround), follow the link above — don't duplicate it.
 
+### Windows host MCP bridge
+
+Use the Windows MCP bridge when Hermes runs inside WSL but you need Windows-native operations such as service checks, firewall rules, registry values, or scheduled tasks. The bridge is a real MCP SSE server that runs on the Windows host and exposes these tools to the WSL-side Hermes client:
+
+- `windows_exec`
+- `windows_service`
+- `windows_registry`
+- `windows_firewall`
+- `windows_schedule`
+
+On the Windows host, install or update Hermes, then run:
+
+```powershell
+hermes mcp windows-bridge --host 0.0.0.0 --port 48779
+```
+
+If Windows Firewall blocks WSL from reaching the port, either approve the prompt or add a local rule:
+
+```powershell
+New-NetFirewallRule -DisplayName "Hermes Windows MCP 48779" `
+  -Direction Inbound -Protocol TCP -LocalPort 48779 -Action Allow
+```
+
+From WSL, find the Windows host address:
+
+```bash
+awk '/nameserver/ { print $2; exit }' /etc/resolv.conf
+```
+
+Then add this to the WSL-side `~/.hermes/config.yaml`:
+
+```yaml
+mcp_servers:
+  windows:
+    url: "http://<windows-host-ip>:48779/sse"
+    transport: sse
+    connect_timeout: 10
+    timeout: 120
+```
+
+Reload MCP in the running Hermes session, or start a fresh one:
+
+```text
+/reload-mcp
+```
+
+Verify from WSL before starting Hermes if needed:
+
+```bash
+curl -i --max-time 5 http://<windows-host-ip>:48779/sse
+```
+
+Keep the bridge bound to a trusted interface. Binding to `0.0.0.0` is convenient for WSL NAT mode, but it can expose Windows command execution to your LAN if your firewall allows it.
+
 ### Case 2 — Something on Windows (or your LAN) talks to Hermes in WSL
 
 This is the reverse direction and is less documented elsewhere, but it's what you need for:
