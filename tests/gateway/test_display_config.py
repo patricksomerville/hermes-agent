@@ -181,11 +181,12 @@ class TestYAMLNormalisation:
         assert resolve_display_setting(config, "telegram", "busy_status_detail") is False
 
     def test_quiet_boolean_defaults_true(self):
-        """Quiet-mode booleans default to the existing chatty behavior."""
+        """Quiet-mode booleans default to platform-aware behavior."""
         from gateway.display_config import resolve_display_setting
 
         assert resolve_display_setting({}, "telegram", "interim_assistant_messages") is True
-        assert resolve_display_setting({}, "telegram", "busy_status_detail") is True
+        assert resolve_display_setting({}, "telegram", "busy_status_detail") is False
+        assert resolve_display_setting({}, "discord", "busy_status_detail") is True
 
     def test_email_defaults_interim_assistant_messages_off(self):
         """Email should only deliver final responses by default."""

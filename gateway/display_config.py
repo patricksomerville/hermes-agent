@@ -165,6 +165,9 @@ def resolve_display_setting(
     -------
     The resolved value, or *fallback* if nothing is configured.
     """
+    if setting == "busy_status_detail":
+        setting = "busy_ack_detail"
+
     display_cfg = user_config.get("display") or {}
 
     # 1. Explicit per-platform override (display.platforms.<platform>.<key>)
