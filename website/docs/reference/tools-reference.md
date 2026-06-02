@@ -8,7 +8,7 @@ description: "Authoritative reference for Hermes built-in tools, grouped by tool
 
 This page documents Hermes' built-in tools, grouped by toolset. Availability varies by platform, credentials, and enabled toolsets.
 
-**Quick counts (current registry):** ~64 tools — 10 browser tools (core) + 2 CDP-gated browser tools, 4 file tools, 4 Home Assistant tools, 2 terminal tools, 2 web tools, 5 Feishu tools, 7 Spotify tools (registered by the bundled `spotify` plugin), 5 Yuanbao tools, 9 kanban tools (registered when the kanban dispatcher spawns the agent), 2 Discord tools, and a handful of standalone tools (`memory`, `clarify`, `delegate_task`, `execute_code`, `cronjob`, `session_search`, `skill_view`/`skill_manage`/`skills_list`, `text_to_speech`, `image_generate`, `video_generate`, `vision_analyze`, `video_analyze`, `mixture_of_agents`, `send_message`, `todo`, `computer_use`, `process`).
+**Quick counts (current registry):** ~73 tools — 10 browser tools (core) + 2 CDP-gated browser tools, 4 file tools, 10 RL tools, 4 Home Assistant tools, 2 terminal tools, 2 web tools, 5 Feishu tools, 7 Spotify tools (registered by the bundled `spotify` plugin), 5 Yuanbao tools, 9 kanban tools (registered when the kanban dispatcher spawns the agent), 2 Discord tools, and a handful of standalone tools (`memory`, `clarify`, `delegate_task`, `execute_code`, `cronjob`, `session_search`, `skill_view`/`skill_manage`/`skills_list`, `text_to_speech`, `image_generate`, `video_generate`, `cloud_video_edit`, `gemini_omni_handoff`, `sound_collage_edit`, `media_connector_status`, `vision_analyze`, `video_analyze`, `mixture_of_agents`, `send_message`, `todo`, `computer_use`, `process`).
 
 :::tip MCP Tools
 In addition to built-in tools, Hermes can load tools dynamically from MCP servers. MCP tools appear with the prefix `mcp_<server>_` (e.g., `mcp_github_create_issue` for the `github` MCP server). See [MCP Integration](/user-guide/features/mcp) for configuration.
@@ -206,6 +206,35 @@ The single `video_generate` tool covers both modalities — pass `image_url` to 
 |------|-------------|----------------------|
 | `video_generate` | Generate a video from a text prompt (text-to-video) or animate a still image (image-to-video) using the user's configured video generation backend. Pass `image_url` to animate that image; omit it to generate from text alone. The backend auto-routes to the right endpoint. Returns either an HTTP URL or an absolute file path in the `video` field. | Active `video_gen` plugin + its credential (e.g. `XAI_API_KEY`, `FAL_KEY`) |
 
+## `video_editing` toolset
+
+Background editing and post-production jobs. Use this for deterministic FFmpeg preview renders, thumbnails, title cards, social/aspect exports, review stills, local review HTML, EDL, generated Remotion review projects, and Gemini Omni / Google Flow handoff packets.
+
+| Tool | Description | Requires environment |
+|------|-------------|----------------------|
+| `cloud_video_edit` | Submit, track, fetch, or cancel a video edit job. Accepts structured edit plans with output presets and clips, then returns job status plus `render_plan`, `review_packet`, `review.html`, `remotion_props`, `remotion-review/`, review stills, thumbnail, and EDL metadata shaped for Remotion review UIs and downstream NLE handoff. | `ffmpeg` for rendering |
+| `gemini_omni_handoff` | Prepare Gemini Omni / Google Flow creative editing packets with Flow-ready prompts, asset manifests, review HTML, and future API request drafts. Use when direct Gemini Omni API access is not verified but the edit should move through Omni/Flow. | None for handoff packets; optional `GOOGLE_FLOW_HOME_URL`, `GEMINI_OMNI_API_URL`, `GEMINI_OMNI_API_KEY` for connector status |
+| `media_connector_status` | Check configured media, publishing, paid generation, transcription, local LLM, and local voice connectors without revealing secrets. Use before promising Google Photos, Vimeo, YouTube channel, Cloudinary, Runway, Replicate, FAL, Gemini Omni/Flow, ElevenLabs, Mux, Frame.io, Aqua, Orpheus, or Vox/VoxCPM behavior. | Optional connector env vars such as `CLOUDINARY_URL`, `VIMEO_ACCESS_TOKEN`, `YOUTUBE_*`, `GOOGLE_PHOTOS_*`, `RUNWAY_API_KEY`, `REPLICATE_API_TOKEN`, `GOOGLE_FLOW_HOME_URL`, `GEMINI_OMNI_API_*`, `ORPHEUS_TTS_COMMAND`, `VOX_TTS_COMMAND` |
+
+## `sound_design` toolset
+
+Audio editing and sound design jobs. Use this for overlapping speech montage, podcast collage, transcript-driven audio essays, soundscapes, local voice checks, and media connector preflights.
+
+| Tool | Description | Requires environment |
+|------|-------------|----------------------|
+| `sound_collage_edit` | Submit, track, fetch, or cancel audio montage jobs. Accepts structured collage plans with source clips, timestamps, overlap, fades, gains, speakers, transcript text, and rivet words, then returns MP3/WAV/spectrogram/timeline/review artifacts. | `ffmpeg` and `ffprobe` |
+| `media_connector_status` | Check local voice, transcription, media library, publishing, and remote worker readiness without revealing secrets. | Optional connector env vars; local model config via `hermes model`; local voice config via `tts.providers.<name>.command` |
+
+## `media_connectors` toolset
+
+Readiness and guardrail checks for connected media services. The tool reports
+only booleans for secrets, and `preflight` marks upload/publish/generate/paid
+operations as approval-gated.
+
+| Tool | Description | Requires environment |
+|------|-------------|----------------------|
+| `media_connector_status` | Report configured connector status, emit a supported env template, or preflight a single service/operation before upload, publish, generation, paid transcription, or remote rendering. Includes `gemini_omni` for Google Flow handoff / future direct Omni API readiness. | Optional connector env vars; local model config via `hermes model`; local voice config via `tts.providers.<name>.command` |
+
 ## `web` toolset
 
 | Tool | Description | Requires environment |
@@ -266,5 +295,3 @@ Registered only on the `hermes-yuanbao` platform toolset. Yuanbao is Tencent's c
 | `yb_send_dm` | Send a private/direct message to a user in a group, with optional media files. | Yuanbao credentials |
 | `yb_search_sticker` | Search the built-in Yuanbao sticker (TIM face) catalogue by keyword. | Yuanbao credentials |
 | `yb_send_sticker` | Send a built-in sticker to the current Yuanbao chat. | Yuanbao credentials |
-
-

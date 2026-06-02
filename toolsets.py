@@ -54,6 +54,8 @@ _HERMES_CORE_TOOLS = [
     "clarify",
     # Code execution + delegation
     "execute_code", "delegate_task",
+    # Background video/audio editing, Remotion/Omni handoffs, and media connector preflights
+    "cloud_video_edit", "gemini_omni_handoff", "sound_collage_edit", "media_connector_status",
     # Cronjob management
     "cronjob",
     # Cross-platform messaging (gated on gateway running via check_fn)
@@ -136,6 +138,35 @@ TOOLSETS = {
             "``hermes tools`` → Video Generation."
         ),
         "tools": ["video_generate"],
+        "includes": []
+    },
+
+    "video_editing": {
+        "description": (
+            "Video editing/post-production jobs: FFmpeg preview renders, "
+            "review packets, thumbnails, Remotion handoff metadata, Gemini "
+            "Omni/Flow handoff packets, and media connector preflights."
+        ),
+        "tools": ["cloud_video_edit", "gemini_omni_handoff", "media_connector_status"],
+        "includes": []
+    },
+
+    "sound_design": {
+        "description": (
+            "Overlapping speech montage, sound collage, podcast-style "
+            "essay edits, sound design, soundscapes, and local voice/media "
+            "connector preflights."
+        ),
+        "tools": ["sound_collage_edit", "media_connector_status"],
+        "includes": []
+    },
+
+    "media_connectors": {
+        "description": (
+            "Credential/status preflights for media libraries, publishing "
+            "targets, paid generation services, local LLMs, and local voice."
+        ),
+        "tools": ["media_connector_status"],
         "includes": []
     },
 

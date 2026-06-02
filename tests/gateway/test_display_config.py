@@ -187,6 +187,12 @@ class TestYAMLNormalisation:
         assert resolve_display_setting({}, "telegram", "interim_assistant_messages") is True
         assert resolve_display_setting({}, "telegram", "busy_status_detail") is True
 
+    def test_email_defaults_interim_assistant_messages_off(self):
+        """Email should only deliver final responses by default."""
+        from gateway.display_config import resolve_display_setting
+
+        assert resolve_display_setting({}, "email", "interim_assistant_messages") is False
+
     def test_platform_override_false_tool_progress(self):
         """Per-platform bare off → normalised."""
         from gateway.display_config import resolve_display_setting

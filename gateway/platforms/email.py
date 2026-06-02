@@ -182,6 +182,41 @@ def _extract_email_address(raw: str) -> str:
     return raw.strip().lower()
 
 
+def _normalize_thread_subject(subject: str) -> str:
+    """Normalize an email subject into a stable session thread key."""
+    subject = (subject or "").strip()
+    subject = re.sub(r"^(?:\s*re:\s*)+", "", subject, flags=re.IGNORECASE).strip()
+    subject = subject.lower()
+    subject = re.sub(r"[^a-z0-9]+", "_", subject).strip("_")
+    return subject[:64] or "default"
+
+
+def _thread_context_key(address: str, thread_id: Optional[str] = None) -> str:
+    """Return the in-memory key for a sender/thread reply context."""
+    address = (address or "").strip().lower()
+    thread_id = (thread_id or "").strip()
+    return f"{address}:{thread_id}" if thread_id else address
+
+
+def _split_email_chat_id(chat_id: str) -> Tuple[str, Optional[str]]:
+    """Split an email chat/session id into deliverable address and thread.
+
+    Current Hermes email sources keep ``chat_id`` as the bare sender address
+    and use ``thread_id`` for session isolation. This also accepts the older
+    ``address:thread`` shape for compatibility with subject-scoped callers.
+    """
+    chat_id = (chat_id or "").strip()
+    if "@" in chat_id and ":" in chat_id:
+        address, thread_id = chat_id.split(":", 1)
+        return address, thread_id or None
+    return chat_id, None
+
+
+def _email_address_from_chat_id(chat_id: str) -> str:
+    """Return the deliverable address from an email chat/session id."""
+    return _split_email_chat_id(chat_id)[0]
+
+
 def _extract_attachments(
     msg: email_lib.message.Message,
     skip_attachments: bool = False,
@@ -268,7 +303,7 @@ class EmailAdapter(BasePlatformAdapter):
         self._seen_uids_max: int = 2000   # cap to prevent unbounded memory growth
         self._poll_task: Optional[asyncio.Task] = None
 
-        # Map chat_id (sender email) -> last subject + message-id for threading
+        # Map sender/thread -> last subject + message-id for reply threading
         self._thread_context: Dict[str, Dict[str, str]] = {}
 
         logger.info("[Email] Adapter initialized for %s", self._address)
@@ -473,11 +508,16 @@ class EmailAdapter(BasePlatformAdapter):
             if att["type"] == "image":
                 msg_type = MessageType.PHOTO
 
-        # Store thread context for reply threading
-        self._thread_context[sender_addr] = {
+        thread_id = _normalize_thread_subject(subject)
+
+        # Store thread context for reply threading. Keep the sender-level
+        # fallback for direct sends/tests that do not carry thread metadata.
+        thread_ctx = {
             "subject": subject,
             "message_id": msg_data["message_id"],
         }
+        self._thread_context[_thread_context_key(sender_addr, thread_id)] = thread_ctx
+        self._thread_context[sender_addr] = thread_ctx
 
         source = self.build_source(
             chat_id=sender_addr,
@@ -485,6 +525,7 @@ class EmailAdapter(BasePlatformAdapter):
             chat_type="dm",
             user_id=sender_addr,
             user_name=msg_data["sender_name"] or sender_addr,
+            thread_id=thread_id,
         )
 
         event = MessageEvent(
@@ -510,8 +551,9 @@ class EmailAdapter(BasePlatformAdapter):
         """Send an email reply to the given address."""
         try:
             loop = asyncio.get_running_loop()
+            thread_id = metadata.get("thread_id") if isinstance(metadata, dict) else None
             message_id = await loop.run_in_executor(
-                None, self._send_email, chat_id, content, reply_to
+                None, self._send_email, chat_id, content, reply_to, thread_id
             )
             return SendResult(success=True, message_id=message_id)
         except Exception as e:
@@ -523,14 +565,20 @@ class EmailAdapter(BasePlatformAdapter):
         to_addr: str,
         body: str,
         reply_to_msg_id: Optional[str] = None,
+        thread_id: Optional[str] = None,
     ) -> str:
         """Send an email via SMTP. Runs in executor thread."""
+        delivery_addr, legacy_thread_id = _split_email_chat_id(to_addr)
+        thread_id = thread_id or legacy_thread_id
         msg = MIMEMultipart()
         msg["From"] = self._address
-        msg["To"] = to_addr
+        msg["To"] = delivery_addr
 
         # Thread context for reply
-        ctx = self._thread_context.get(to_addr, {})
+        ctx = self._thread_context.get(
+            _thread_context_key(delivery_addr, thread_id),
+            self._thread_context.get(delivery_addr, {}),
+        )
         subject = ctx.get("subject", "Hermes Agent")
         if not subject.startswith("Re:"):
             subject = f"Re: {subject}"
@@ -559,7 +607,7 @@ class EmailAdapter(BasePlatformAdapter):
             except Exception:
                 smtp.close()
 
-        logger.info("[Email] Sent reply to %s (subject: %s)", to_addr, subject)
+        logger.info("[Email] Sent reply to %s (subject: %s)", delivery_addr, subject)
         return msg_id
 
     async def send_typing(self, chat_id: str, metadata: Optional[Dict[str, Any]] = None) -> None:

@@ -328,9 +328,9 @@ def _get_provider(tts_config: Dict[str, Any]) -> str:
 # ===========================================================================
 #
 # Users can declare any number of command-type providers alongside the
-# built-ins so they can plug any local CLI (Piper, VoxCPM, Kokoro CLIs,
-# custom voice-cloning scripts, etc.) into Hermes without any Python code
-# changes. The config shape is::
+# built-ins so they can plug any local CLI (Orpheus, VoxCPM, Piper,
+# Kokoro CLIs, custom voice-cloning scripts, etc.) into Hermes without
+# any Python code changes. The config shape is::
 #
 #     tts:
 #       provider: piper-en

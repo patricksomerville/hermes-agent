@@ -5070,6 +5070,10 @@ class TelegramAdapter(BasePlatformAdapter):
     def _should_process_message(self, message: Message, *, is_command: bool = False) -> bool:
         """Apply Telegram group trigger rules.
 
+        Bot-authored messages are always ignored. Telegram groups can contain
+        multiple Hermes bot identities; letting bots process bot messages is a
+        self-licking ice cream cone with a typing indicator. Humans only.
+
         DMs remain unrestricted. Group/supergroup messages are accepted when:
         - the chat passes the ``allowed_chats`` whitelist (when set), or
           ``guest_mode`` is enabled and the bot is explicitly mentioned
@@ -5089,6 +5093,10 @@ class TelegramAdapter(BasePlatformAdapter):
         mentioning the bot (``@botname /command``), both of which are
         recognised as mentions by :meth:`_message_mentions_bot`.
         """
+        sender = getattr(message, "from_user", None)
+        if sender is not None and bool(getattr(sender, "is_bot", False)):
+            return False
+
         if not self._is_group_chat(message):
             return True
 

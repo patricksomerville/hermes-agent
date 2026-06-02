@@ -62,6 +62,9 @@ CONFIGURABLE_TOOLSETS = [
     ("video",           "🎬 Video Analysis",            "video_analyze (requires video-capable model)"),
     ("image_gen",       "🎨 Image Generation",          "image_generate"),
     ("video_gen",       "🎬 Video Generation",          "video_generate (text-to-video + image-to-video)"),
+    ("video_editing",   "🎞️  Video Editing",            "background renders, review packets, Remotion handoff"),
+    ("sound_design",    "🎧 Sound Design",              "overlapping speech montage, sound collage, soundscapes"),
+    ("media_connectors", "🔌 Media Connectors",          "credential/status preflight for media APIs and local voice"),
     ("x_search",        "🐦 X (Twitter) Search",        "x_search (requires xAI OAuth or XAI_API_KEY)"),
     ("moa",             "🧠 Mixture of Agents",         "mixture_of_agents"),
     ("tts",             "🔊 Text-to-Speech",            "text_to_speech"),
@@ -279,6 +282,57 @@ TOOL_CATEGORIES = {
                 "tts_provider": "piper",
                 "post_setup": "piper",
             },
+            {
+                "name": "Orpheus",
+                "badge": "local · command",
+                "tag": "Local expressive TTS via your installed Orpheus command/server",
+                "env_vars": [
+                    {
+                        "key": "ORPHEUS_TTS_COMMAND",
+                        "prompt": "Orpheus command template using {input_path} and {output_path}",
+                        "url": "https://github.com/canopyai/Orpheus-TTS",
+                        "password": False,
+                    },
+                ],
+                "tts_provider": "orpheus",
+                "tts_command_provider": {
+                    "name": "orpheus",
+                    "command_env": "ORPHEUS_TTS_COMMAND",
+                    "defaults": {
+                        "type": "command",
+                        "model": "canopylabs/orpheus-tts-0.1-finetune-prod",
+                        "voice": "tara",
+                        "output_format": "wav",
+                        "timeout": 240,
+                        "voice_compatible": True,
+                    },
+                },
+            },
+            {
+                "name": "Vox / VoxCPM",
+                "badge": "local · command",
+                "tag": "Local Vox/VoxCPM TTS via your installed command/server",
+                "env_vars": [
+                    {
+                        "key": "VOX_TTS_COMMAND",
+                        "prompt": "Vox command template using {input_path} and {output_path}",
+                        "url": "https://huggingface.co/openbmb/VoxCPM-0.5B",
+                        "password": False,
+                    },
+                ],
+                "tts_provider": "vox",
+                "tts_command_provider": {
+                    "name": "vox",
+                    "command_env": "VOX_TTS_COMMAND",
+                    "defaults": {
+                        "type": "command",
+                        "model": "openbmb/VoxCPM-0.5B",
+                        "output_format": "wav",
+                        "timeout": 240,
+                        "voice_compatible": True,
+                    },
+                },
+            },
         ],
     },
     "web": {
@@ -364,6 +418,119 @@ TOOL_CATEGORIES = {
                 # and video_gen.use_gateway = True so the FAL plugin
                 # routes through the managed queue gateway.
                 "video_gen_plugin_name": "fal",
+            },
+        ],
+    },
+    "media_connectors": {
+        "name": "Media Connectors",
+        "setup_title": "Select Media Connector",
+        "setup_note": (
+            "These keys make the status/preflight map durable. Most services "
+            "still require a dedicated tool before Hermes can upload or publish."
+        ),
+        "icon": "🔌",
+        "providers": [
+            {
+                "name": "Cloudinary URL",
+                "tag": "Asset CDN, transforms, signed delivery",
+                "env_vars": [
+                    {"key": "CLOUDINARY_URL", "prompt": "Cloudinary URL", "url": "https://cloudinary.com/console"},
+                ],
+            },
+            {
+                "name": "Cloudinary key triplet",
+                "tag": "Alternative to CLOUDINARY_URL",
+                "env_vars": [
+                    {"key": "CLOUDINARY_CLOUD_NAME", "prompt": "Cloudinary cloud name", "url": "https://cloudinary.com/console", "password": False},
+                    {"key": "CLOUDINARY_API_KEY", "prompt": "Cloudinary API key", "url": "https://cloudinary.com/console"},
+                    {"key": "CLOUDINARY_API_SECRET", "prompt": "Cloudinary API secret", "url": "https://cloudinary.com/console"},
+                ],
+            },
+            {
+                "name": "Vimeo",
+                "tag": "Upload, transcode polling, metadata, review links",
+                "env_vars": [
+                    {"key": "VIMEO_ACCESS_TOKEN", "prompt": "Vimeo access token", "url": "https://developer.vimeo.com/apps"},
+                ],
+            },
+            {
+                "name": "YouTube Channel OAuth",
+                "tag": "Upload, thumbnails, captions, playlists",
+                "env_vars": [
+                    {"key": "YOUTUBE_CLIENT_ID", "prompt": "YouTube OAuth client ID", "url": "https://console.cloud.google.com/apis/credentials"},
+                    {"key": "YOUTUBE_CLIENT_SECRET", "prompt": "YouTube OAuth client secret", "url": "https://console.cloud.google.com/apis/credentials"},
+                    {"key": "YOUTUBE_REFRESH_TOKEN", "prompt": "YouTube refresh token", "url": "https://developers.google.com/youtube/v3/guides/auth/server-side-web-apps"},
+                ],
+            },
+            {
+                "name": "Google Photos OAuth",
+                "tag": "Picker/import and app-created media workflows",
+                "env_vars": [
+                    {"key": "GOOGLE_PHOTOS_CLIENT_ID", "prompt": "Google Photos OAuth client ID", "url": "https://console.cloud.google.com/apis/credentials"},
+                    {"key": "GOOGLE_PHOTOS_CLIENT_SECRET", "prompt": "Google Photos OAuth client secret", "url": "https://console.cloud.google.com/apis/credentials"},
+                    {"key": "GOOGLE_PHOTOS_REFRESH_TOKEN", "prompt": "Google Photos refresh token", "url": "https://developers.google.com/photos"},
+                ],
+            },
+            {
+                "name": "Runway",
+                "tag": "Paid video generation and task polling",
+                "env_vars": [
+                    {"key": "RUNWAY_API_KEY", "prompt": "Runway API key", "url": "https://dev.runwayml.com/"},
+                ],
+            },
+            {
+                "name": "Replicate",
+                "tag": "Paid model predictions",
+                "env_vars": [
+                    {"key": "REPLICATE_API_TOKEN", "prompt": "Replicate API token", "url": "https://replicate.com/account/api-tokens"},
+                ],
+            },
+            {
+                "name": "Gemini Omni / Google Flow",
+                "tag": "Flow handoff now; direct API fields for future verified endpoint",
+                "env_vars": [
+                    {"key": "GOOGLE_FLOW_HOME_URL", "prompt": "Google Flow home URL", "url": "https://flow.google", "password": False},
+                    {"key": "GEMINI_OMNI_API_URL", "prompt": "Gemini Omni API URL when Google exposes one", "password": False},
+                    {"key": "GEMINI_OMNI_API_KEY", "prompt": "Gemini Omni API key when direct API is available", "url": "https://aistudio.google.com/app/apikey"},
+                ],
+            },
+            {
+                "name": "Mux",
+                "tag": "Playback/review assets and HLS",
+                "env_vars": [
+                    {"key": "MUX_TOKEN_ID", "prompt": "Mux token ID", "url": "https://dashboard.mux.com/settings/access-tokens"},
+                    {"key": "MUX_TOKEN_SECRET", "prompt": "Mux token secret", "url": "https://dashboard.mux.com/settings/access-tokens"},
+                ],
+            },
+            {
+                "name": "Frame.io",
+                "tag": "Review links, comments, versions",
+                "env_vars": [
+                    {"key": "FRAME_IO_ACCESS_TOKEN", "prompt": "Frame.io access token", "url": "https://developer.frame.io/"},
+                ],
+            },
+            {
+                "name": "AssemblyAI",
+                "tag": "Word-level transcription and captions",
+                "env_vars": [
+                    {"key": "ASSEMBLYAI_API_KEY", "prompt": "AssemblyAI API key", "url": "https://www.assemblyai.com/dashboard/api-keys"},
+                ],
+            },
+            {
+                "name": "Deepgram",
+                "tag": "Transcription, captions, diarization",
+                "env_vars": [
+                    {"key": "DEEPGRAM_API_KEY", "prompt": "Deepgram API key", "url": "https://console.deepgram.com/"},
+                ],
+            },
+            {
+                "name": "Aqua media worker",
+                "tag": "Remote local media/voice/video service URLs",
+                "env_vars": [
+                    {"key": "AQUA_MEDIA_SERVICE_URL", "prompt": "Aqua media service URL", "password": False},
+                    {"key": "AQUA_VIDEO_SERVICE_URL", "prompt": "Aqua video service URL", "password": False},
+                    {"key": "AQUA_VOICE_SERVICE_URL", "prompt": "Aqua voice service URL", "password": False},
+                ],
             },
         ],
     },
@@ -2614,6 +2781,45 @@ def _select_plugin_video_gen_provider(plugin_name: str, config: dict, *, use_gat
     _configure_videogen_model_for_plugin(plugin_name, config)
 
 
+def _apply_tts_command_provider(provider: dict, config: dict) -> bool:
+    """Persist a command-backed local TTS provider selection."""
+    spec = provider.get("tts_command_provider")
+    if not isinstance(spec, dict):
+        return True
+
+    name = str(spec.get("name") or provider.get("tts_provider") or "").strip().lower()
+    if not name:
+        _print_warning("  Local TTS command provider is missing a provider name.")
+        return False
+
+    command = str(spec.get("command") or "").strip()
+    command_env = str(spec.get("command_env") or "").strip()
+    if not command and command_env:
+        command = get_env_value(command_env) or ""
+    if not command:
+        env_hint = f" ({command_env})" if command_env else ""
+        _print_warning(f"  Local TTS command template is not configured{env_hint}.")
+        return False
+
+    tts_cfg = config.setdefault("tts", {})
+    if not isinstance(tts_cfg, dict):
+        tts_cfg = {}
+        config["tts"] = tts_cfg
+    providers = tts_cfg.setdefault("providers", {})
+    if not isinstance(providers, dict):
+        providers = {}
+        tts_cfg["providers"] = providers
+
+    entry = dict(spec.get("defaults") or {})
+    entry["type"] = "command"
+    entry["command"] = command
+    providers[name] = entry
+    tts_cfg["provider"] = name
+    tts_cfg["use_gateway"] = False
+    _print_success(f"  TTS command provider set to: {name}")
+    return True
+
+
 def _write_provider_config(provider: dict, config: dict, *, managed_feature) -> None:
     """Persist the provider/backend config keys for a selected provider.
 
@@ -2625,7 +2831,7 @@ def _write_provider_config(provider: dict, config: dict, *, managed_feature) -> 
     ``PUT .../provider`` endpoint call through here so there is one code path.
     """
     # Set TTS provider in config if applicable
-    if provider.get("tts_provider"):
+    if provider.get("tts_provider") and not provider.get("tts_command_provider"):
         tts_cfg = config.setdefault("tts", {})
         tts_cfg["provider"] = provider["tts_provider"]
         tts_cfg["use_gateway"] = bool(managed_feature)
@@ -2789,6 +2995,8 @@ def _configure_provider(
     if not env_vars:
         if provider.get("post_setup"):
             _run_post_setup(provider["post_setup"])
+        if not _apply_tts_command_provider(provider, config):
+            return
         _print_success(f"  {provider['name']} - no configuration needed!")
         if managed_feature:
             _print_info("  Requests for this tool will be billed to your Nous subscription.")
@@ -2860,7 +3068,10 @@ def _configure_provider(
             if default_val:
                 value = _prompt(f"    {var.get('prompt', var['key'])}", default_val)
             else:
-                value = _prompt(f"    {var.get('prompt', var['key'])}", password=True)
+                value = _prompt(
+                    f"    {var.get('prompt', var['key'])}",
+                    password=var.get("password", True),
+                )
 
             if value:
                 save_env_value(var["key"], value)
@@ -2874,6 +3085,8 @@ def _configure_provider(
         _run_post_setup(provider["post_setup"])
 
     if all_configured:
+        if not _apply_tts_command_provider(provider, config):
+            return
         _print_success(f"  {provider['name']} configured!")
         plugin_name = provider.get("image_gen_plugin_name")
         if plugin_name:
@@ -3130,7 +3343,7 @@ def _reconfigure_provider(
             )
             return
 
-    if provider.get("tts_provider"):
+    if provider.get("tts_provider") and not provider.get("tts_command_provider"):
         tts_cfg = config.setdefault("tts", {})
         tts_cfg["provider"] = provider["tts_provider"]
         tts_cfg["use_gateway"] = bool(managed_feature)
@@ -3171,6 +3384,8 @@ def _reconfigure_provider(
     if not env_vars:
         if provider.get("post_setup"):
             _run_post_setup(provider["post_setup"])
+        if not _apply_tts_command_provider(provider, config):
+            return
         _print_success(f"  {provider['name']} - no configuration needed!")
         if managed_feature:
             _print_info("  Requests for this tool will be billed to your Nous subscription.")
@@ -3202,7 +3417,10 @@ def _reconfigure_provider(
         if url:
             _print_info(f"  Get yours at: {url}")
         default_val = var.get("default", "")
-        value = _prompt(f"    {var.get('prompt', var['key'])} (Enter to keep current)", password=not default_val)
+        value = _prompt(
+            f"    {var.get('prompt', var['key'])} (Enter to keep current)",
+            password=var.get("password", not default_val),
+        )
         if value and value.strip():
             save_env_value(var["key"], value.strip())
             _print_success("    Updated")
@@ -3211,6 +3429,9 @@ def _reconfigure_provider(
 
     if provider.get("post_setup"):
         _run_post_setup(provider["post_setup"])
+
+    if not _apply_tts_command_provider(provider, config):
+        return
 
     # Imagegen backends prompt for model selection on reconfig too.
     plugin_name = provider.get("image_gen_plugin_name")

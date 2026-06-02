@@ -4194,6 +4194,44 @@ class TestRetryExhaustion:
         assert "error" in result
         assert "rate limited" in result["error"]
 
+    def test_rate_limit_with_fallback_does_not_crash_on_pool_helper(self, agent):
+        """Regression: fallback-on-429 must resolve the pool helper after extraction."""
+        self._setup_agent(agent)
+
+        class _RateLimitError(Exception):
+            status_code = 429
+
+            def __str__(self):
+                return "Error code: 429 - usage_limit_reached"
+
+        agent._fallback_chain = [{"provider": "openrouter", "model": "openai/gpt-5.5"}]
+        agent._fallback_index = 0
+        agent._fallback_activated = False
+        agent.client.chat.completions.create.side_effect = [
+            _RateLimitError(),
+            _mock_response(content="Fallback answer.", finish_reason="stop"),
+        ]
+
+        def _mock_fallback(reason=None):
+            agent._fallback_index = 1
+            agent._fallback_activated = True
+            agent.provider = "openrouter"
+            agent.model = "openai/gpt-5.5"
+            return True
+
+        with (
+            patch.object(agent, "_try_activate_fallback", side_effect=_mock_fallback) as fallback,
+            patch.object(agent, "_persist_session"),
+            patch.object(agent, "_save_trajectory"),
+            patch.object(agent, "_cleanup_task_resources"),
+            patch("run_agent.time", self._make_fast_time_mock()),
+        ):
+            result = agent.run_conversation("hello")
+
+        fallback.assert_called_once()
+        assert result["completed"] is True
+        assert result["final_response"] == "Fallback answer."
+
     def test_build_api_kwargs_error_no_unbound_local(self, agent):
         """When _build_api_kwargs raises, except handler must not crash with UnboundLocalError.
 

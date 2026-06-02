@@ -585,6 +585,21 @@ class CommentaryAgent:
         }
 
 
+class StatusCallbackAgent:
+    def __init__(self, **kwargs):
+        self.status_callback = kwargs.get("status_callback")
+        self.tools = []
+
+    def run_conversation(self, message, conversation_history=None, task_id=None):
+        if self.status_callback:
+            self.status_callback("lifecycle", "Loading previous context...")
+        return {
+            "final_response": "done",
+            "messages": [],
+            "api_calls": 1,
+        }
+
+
 class PreviewedResponseAgent:
     def __init__(self, **kwargs):
         self.interim_assistant_callback = kwargs.get("interim_assistant_callback")
@@ -793,6 +808,40 @@ async def test_run_agent_surfaces_interim_commentary_by_default(monkeypatch, tmp
     )
 
     assert any(call["content"] == "I'll inspect the repo first." for call in adapter.sent)
+
+
+@pytest.mark.asyncio
+async def test_run_agent_email_suppresses_interim_commentary(monkeypatch, tmp_path):
+    adapter, result = await _run_with_agent(
+        monkeypatch,
+        tmp_path,
+        CommentaryAgent,
+        session_id="sess-email-commentary-quiet",
+        platform=Platform.EMAIL,
+        chat_id="user@test.com",
+        chat_type="dm",
+        thread_id="budget_review",
+    )
+
+    assert result.get("already_sent") is not True
+    assert adapter.sent == []
+
+
+@pytest.mark.asyncio
+async def test_run_agent_email_suppresses_lifecycle_status(monkeypatch, tmp_path):
+    adapter, result = await _run_with_agent(
+        monkeypatch,
+        tmp_path,
+        StatusCallbackAgent,
+        session_id="sess-email-status-quiet",
+        platform=Platform.EMAIL,
+        chat_id="user@test.com",
+        chat_type="dm",
+        thread_id="budget_review",
+    )
+
+    assert result.get("already_sent") is not True
+    assert adapter.sent == []
 
 
 @pytest.mark.asyncio

@@ -338,6 +338,7 @@ def _run_agent(
         provider=runtime.get("provider"),
         api_mode=runtime.get("api_mode"),
         model=effective_model,
+        fallback_model=cfg.get("fallback_providers") or cfg.get("fallback_model"),
         enabled_toolsets=toolsets_list,
         quiet_mode=True,
         platform="cli",

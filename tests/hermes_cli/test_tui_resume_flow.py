@@ -825,7 +825,13 @@ def test_oneshot_wires_session_db_for_recall(monkeypatch):
     monkeypatch.setitem(
         sys.modules,
         "hermes_cli.config",
-        mod("hermes_cli.config", load_config=lambda: {"model": {"default": "m"}}),
+        mod(
+            "hermes_cli.config",
+            load_config=lambda: {
+                "model": {"default": "m"},
+                "fallback_providers": [{"provider": "openrouter", "model": "openai/gpt-5.5"}],
+            },
+        ),
     )
     monkeypatch.setitem(
         sys.modules,
@@ -855,6 +861,7 @@ def test_oneshot_wires_session_db_for_recall(monkeypatch):
     assert _run_agent("recall this") == "ok"
     assert captured["session_db"] is sentinel_db
     assert captured["enabled_toolsets"] == ["session_search"]
+    assert captured["fallback_model"] == [{"provider": "openrouter", "model": "openai/gpt-5.5"}]
     assert captured["prompt"] == "recall this"
 
 

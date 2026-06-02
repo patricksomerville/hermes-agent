@@ -40,7 +40,7 @@ If you prefer direct config editing, use the native Gemini API base URL:
 
 ```yaml
 model:
-  default: gemini-3-flash-preview
+  default: gemini-3.5-flash
   provider: gemini
   base_url: https://generativelanguage.googleapis.com/v1beta
 ```
@@ -51,7 +51,7 @@ After running `hermes model`, your `~/.hermes/config.yaml` will contain:
 
 ```yaml
 model:
-  default: gemini-3-flash-preview
+  default: gemini-3.5-flash
   provider: gemini
   base_url: https://generativelanguage.googleapis.com/v1beta
 ```
@@ -117,9 +117,10 @@ The `hermes model` picker shows Gemini models maintained in Hermes' provider reg
 
 | Model | ID | Notes |
 |-------|----|-------|
+| Gemini 3.5 Flash | `gemini-3.5-flash` | Recommended default for agentic workflows, coding, multimodal analysis, and long-context planning |
 | Gemini 3.1 Pro Preview | `gemini-3.1-pro-preview` | Most capable preview model when available |
 | Gemini 3 Pro Preview | `gemini-3-pro-preview` | Strong reasoning and coding model |
-| Gemini 3 Flash Preview | `gemini-3-flash-preview` | Recommended default balance of speed and capability |
+| Gemini 3 Flash Preview | `gemini-3-flash-preview` | Previous default balance of speed and capability |
 | Gemini 3.1 Flash Lite Preview | `gemini-3.1-flash-lite-preview` | Fastest / lowest-cost option when available |
 
 Model availability changes over time. If a model disappears or is not enabled for your key, run `hermes model` again and pick one from the current list.
@@ -144,7 +145,13 @@ model:
   base_url: https://generativelanguage.googleapis.com/v1beta
 ```
 
-If you need strict reproducibility, prefer explicit model IDs such as `gemini-3.1-pro-preview` or `gemini-3-flash-preview`.
+If you need strict reproducibility, prefer explicit model IDs such as `gemini-3.5-flash`, `gemini-3.1-pro-preview`, or `gemini-3-flash-preview`.
+
+### Gemini Omni / Google Flow
+
+Gemini Omni is a generative media editing surface, not a normal text/tool-calling provider in Hermes. Use `gemini-3.5-flash` for Bernie-style planning, asset analysis, prompt drafting, and tool orchestration. Use `gemini_omni_handoff` for Gemini Omni / Google Flow packets that bundle prompts, source assets, output specs, and provenance.
+
+Hermes does not assume that `GOOGLE_API_KEY` or `GEMINI_API_KEY` grants direct Gemini Omni API access. Direct submission requires an explicitly configured and verified `GEMINI_OMNI_API_URL` plus `GEMINI_OMNI_API_KEY`; otherwise the supported workflow is a Flow/Gemini handoff packet.
 
 ### Gemma via the Gemini API
 
@@ -173,6 +180,7 @@ model:
 Use the `/model` command during a conversation:
 
 ```text
+/model gemini-3.5-flash
 /model gemini-3-flash-preview
 /model gemini-flash-latest
 /model gemini-3-pro-preview

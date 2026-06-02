@@ -16774,7 +16774,7 @@ class GatewayRunner:
         # tool progress and token streaming. Users can keep tool_progress quiet
         # in chat platforms while opting into concise mid-turn updates.
         interim_assistant_messages_enabled = (
-            source.platform != Platform.WEBHOOK
+            source.platform not in {Platform.WEBHOOK, Platform.EMAIL}
             and is_truthy_value(
                 resolve_display_setting(
                     user_config,
@@ -17331,6 +17331,8 @@ class GatewayRunner:
 
         def _status_callback_sync(event_type: str, message: str) -> None:
             if not _status_adapter or not _run_still_current():
+                return
+            if source.platform == Platform.EMAIL and event_type != "warn":
                 return
             prepared_message = _prepare_gateway_status_message(
                 source.platform,
@@ -18332,6 +18334,8 @@ class GatewayRunner:
         async def _notify_long_running():
             if _NOTIFY_INTERVAL is None:
                 return  # Notifications disabled (gateway_notify_interval: 0)
+            if source.platform == Platform.EMAIL:
+                return
             _notify_adapter = self.adapters.get(source.platform)
             if not _notify_adapter:
                 return

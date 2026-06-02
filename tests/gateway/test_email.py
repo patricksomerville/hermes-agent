@@ -419,9 +419,67 @@ class TestDispatchMessage(unittest.TestCase):
         asyncio.run(adapter._dispatch_message(msg_data))
         event = captured_events[0]
         self.assertEqual(event.source.chat_id, "john@example.com")
+        self.assertEqual(event.source.thread_id, "hi")
         self.assertEqual(event.source.user_id, "john@example.com")
         self.assertEqual(event.source.user_name, "John Doe")
         self.assertEqual(event.source.chat_type, "dm")
+
+    def test_same_sender_different_subjects_use_different_threads(self):
+        """Messages from one sender should be isolated by normalized subject."""
+        import asyncio
+        adapter = self._make_adapter()
+        captured_events = []
+
+        async def capture_handle(event):
+            captured_events.append(event)
+
+        adapter.handle_message = capture_handle
+
+        base_msg = {
+            "uid": b"7",
+            "sender_addr": "john@example.com",
+            "sender_name": "John Doe",
+            "message_id": "<msg7@test.com>",
+            "in_reply_to": "",
+            "body": "Hello",
+            "attachments": [],
+            "date": "",
+        }
+
+        asyncio.run(adapter._dispatch_message({**base_msg, "subject": "Budget Review"}))
+        asyncio.run(adapter._dispatch_message({**base_msg, "subject": "Travel Plans"}))
+
+        self.assertEqual(captured_events[0].source.chat_id, "john@example.com")
+        self.assertEqual(captured_events[1].source.chat_id, "john@example.com")
+        self.assertEqual(captured_events[0].source.thread_id, "budget_review")
+        self.assertEqual(captured_events[1].source.thread_id, "travel_plans")
+
+    def test_re_prefix_reuses_subject_thread(self):
+        """Reply prefixes should not create a separate email session."""
+        import asyncio
+        adapter = self._make_adapter()
+        captured_events = []
+
+        async def capture_handle(event):
+            captured_events.append(event)
+
+        adapter.handle_message = capture_handle
+
+        msg_data = {
+            "uid": b"8",
+            "sender_addr": "john@example.com",
+            "sender_name": "John Doe",
+            "subject": "Re: Re: Budget Review",
+            "message_id": "<msg8@test.com>",
+            "in_reply_to": "<msg7@test.com>",
+            "body": "Following up",
+            "attachments": [],
+            "date": "",
+        }
+
+        asyncio.run(adapter._dispatch_message(msg_data))
+
+        self.assertEqual(captured_events[0].source.thread_id, "budget_review")
 
     def test_non_allowlisted_sender_dropped(self):
         """Senders not in EMAIL_ALLOWED_USERS should be dropped before dispatch."""
@@ -480,6 +538,7 @@ class TestDispatchMessage(unittest.TestCase):
             asyncio.run(adapter._dispatch_message(msg_data))
             self.assertEqual(len(captured_events), 1)
             self.assertEqual(captured_events[0].source.chat_id, "admin@test.com")
+            self.assertEqual(captured_events[0].source.thread_id, "important")
 
     def test_empty_allowlist_allows_all(self):
         """When EMAIL_ALLOWED_USERS is not set, all senders should proceed."""
@@ -547,7 +606,7 @@ class TestThreadContext(unittest.TestCase):
         }
 
         asyncio.run(adapter._dispatch_message(msg_data))
-        ctx = adapter._thread_context.get("user@test.com")
+        ctx = adapter._thread_context.get("user@test.com:project_question")
         self.assertIsNotNone(ctx)
         self.assertEqual(ctx["subject"], "Project question")
         self.assertEqual(ctx["message_id"], "<original@test.com>")
@@ -604,6 +663,55 @@ class TestThreadContext(unittest.TestCase):
             send_call = mock_server.send_message.call_args[0][0]
             self.assertEqual(send_call["Subject"], "Re: Hermes Agent")
             self.assertIn("Date", send_call)
+
+    def test_reply_uses_thread_context_from_metadata(self):
+        """Thread metadata should pick the matching subject for a sender."""
+        import asyncio
+        adapter = self._make_adapter()
+        adapter._thread_context["user@test.com:alpha"] = {
+            "subject": "Alpha",
+            "message_id": "<alpha@test.com>",
+        }
+        adapter._thread_context["user@test.com:beta"] = {
+            "subject": "Beta",
+            "message_id": "<beta@test.com>",
+        }
+
+        with patch("smtplib.SMTP") as mock_smtp:
+            mock_server = MagicMock()
+            mock_smtp.return_value = mock_server
+
+            result = asyncio.run(
+                adapter.send("user@test.com", "Threaded answer.", metadata={"thread_id": "beta"})
+            )
+
+            self.assertTrue(result.success)
+            send_call = mock_server.send_message.call_args[0][0]
+            self.assertEqual(send_call["To"], "user@test.com")
+            self.assertEqual(send_call["Subject"], "Re: Beta")
+            self.assertEqual(send_call["In-Reply-To"], "<beta@test.com>")
+
+    def test_legacy_subject_scoped_chat_id_still_delivers_to_address(self):
+        """Older address:thread chat IDs should not leak into SMTP To."""
+        adapter = self._make_adapter()
+        adapter._thread_context["user@test.com:project_question"] = {
+            "subject": "Project question",
+            "message_id": "<original@test.com>",
+        }
+
+        with patch("smtplib.SMTP") as mock_smtp:
+            mock_server = MagicMock()
+            mock_smtp.return_value = mock_server
+
+            adapter._send_email(
+                "user@test.com:project_question",
+                "Here is the answer.",
+                None,
+            )
+
+            send_call = mock_server.send_message.call_args[0][0]
+            self.assertEqual(send_call["To"], "user@test.com")
+            self.assertEqual(send_call["Subject"], "Re: Project question")
 
 
 class TestSendMethods(unittest.TestCase):

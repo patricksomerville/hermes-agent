@@ -130,7 +130,7 @@ _PLATFORM_DEFAULTS: dict[str, dict[str, Any]] = {
     "dingtalk":        _TIER_LOW,
 
     # Tier 4 — batch or non-interactive delivery
-    "email":           _TIER_MINIMAL,
+    "email":           {**_TIER_MINIMAL, "interim_assistant_messages": False},
     "sms":             _TIER_MINIMAL,
     "webhook":         _TIER_MINIMAL,
     "homeassistant":   _TIER_MINIMAL,

@@ -9,6 +9,7 @@ from hermes_cli.nous_account import NousPortalAccountInfo
 from hermes_cli.tools_config import (
     _DEFAULT_OFF_TOOLSETS,
     _apply_toolset_change,
+    _apply_tts_command_provider,
     _configure_provider,
     _reconfigure_provider,
     _get_platform_tools,
@@ -120,6 +121,43 @@ def test_get_platform_tools_context_engine_respects_explicit_empty_selection():
 
     assert "context_engine" not in enabled
 
+
+def test_configurable_toolsets_include_media_connectors():
+    assert any(ts_key == "media_connectors" for ts_key, _, _ in CONFIGURABLE_TOOLSETS)
+
+
+def test_configurable_toolsets_include_sound_design():
+    assert any(ts_key == "sound_design" for ts_key, _, _ in CONFIGURABLE_TOOLSETS)
+
+
+def test_apply_tts_command_provider_persists_local_voice(monkeypatch):
+    monkeypatch.setattr(
+        "hermes_cli.tools_config.get_env_value",
+        lambda key: "orpheus --text-file {input_path} --out {output_path}"
+        if key == "ORPHEUS_TTS_COMMAND"
+        else "",
+    )
+    config = {}
+    provider = {
+        "tts_provider": "orpheus",
+        "tts_command_provider": {
+            "name": "orpheus",
+            "command_env": "ORPHEUS_TTS_COMMAND",
+            "defaults": {
+                "type": "command",
+                "output_format": "wav",
+                "timeout": 240,
+                "voice_compatible": True,
+            },
+        },
+    }
+
+    assert _apply_tts_command_provider(provider, config) is True
+    assert config["tts"]["provider"] == "orpheus"
+    assert config["tts"]["use_gateway"] is False
+    entry = config["tts"]["providers"]["orpheus"]
+    assert entry["command"] == "orpheus --text-file {input_path} --out {output_path}"
+    assert entry["voice_compatible"] is True
 
 def test_get_platform_tools_default_telegram_includes_messaging():
     enabled = _get_platform_tools({}, "telegram")

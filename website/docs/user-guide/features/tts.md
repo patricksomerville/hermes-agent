@@ -209,7 +209,7 @@ tts:
 
 ### Custom command providers
 
-If a TTS engine you want isn't natively supported (VoxCPM, MLX-Kokoro, XTTS CLI, a voice-cloning script, anything else that exposes a CLI), you can wire it in as a **command-type provider** without writing any Python. Hermes writes the input text to a temp UTF-8 file, runs your shell command, and reads the audio file the command produced.
+If a TTS engine you want isn't natively supported (Orpheus, VoxCPM, MLX-Kokoro, XTTS CLI, a voice-cloning script, anything else that exposes a CLI), you can wire it in as a **command-type provider** without writing any Python. Hermes writes the input text to a temp UTF-8 file, runs your shell command, and reads the audio file the command produced.
 
 Declare one or more providers under `tts.providers.<name>` and switch between them with `tts.provider: <name>` — the same way you switch between built-ins like `edge` and `openai`.
 
@@ -224,6 +224,14 @@ tts:
       timeout: 180
       voice_compatible: true       # try to deliver as a Telegram voice bubble
 
+    orpheus:
+      type: command
+      command: "orpheus-tts --text-file {input_path} --out {output_path} --voice {voice}"
+      voice: tara
+      output_format: wav
+      timeout: 240
+      voice_compatible: true
+
     mlx-kokoro:
       type: command
       command: "python -m mlx_kokoro --in {input_path} --out {output_path} --voice {voice}"
@@ -235,6 +243,10 @@ tts:
       command: "piper -m /path/to/custom.onnx -f {output_path} < {input_path}"
       output_format: wav
 ```
+
+The Orpheus and Vox examples are command templates. Keep the Hermes placeholders,
+but replace the executable name and flags with the runner installed on your
+machine or remote local worker.
 
 #### Example: Doubao (Chinese seed-tts-2.0)
 

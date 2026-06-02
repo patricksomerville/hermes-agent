@@ -91,6 +91,7 @@ def _group_message(
     chat_id=-100,
     from_user_id=111,
     from_user_name="Alice Example",
+    from_user_is_bot=False,
     thread_id=None,
     reply_to_bot=False,
     entities=None,
@@ -99,7 +100,12 @@ def _group_message(
 ):
     reply_to_message = None
     if reply_to_bot:
-        reply_to_message = SimpleNamespace(from_user=SimpleNamespace(id=999), message_id=10, text="previous bot reply", caption=None)
+        reply_to_message = SimpleNamespace(
+            from_user=SimpleNamespace(id=999, is_bot=True),
+            message_id=10,
+            text="previous bot reply",
+            caption=None,
+        )
     return SimpleNamespace(
         message_id=42,
         text=text,
@@ -109,7 +115,12 @@ def _group_message(
         message_thread_id=thread_id,
         is_topic_message=thread_id is not None,
         chat=SimpleNamespace(id=chat_id, type="group", title="Test Group", is_forum=thread_id is not None),
-        from_user=SimpleNamespace(id=from_user_id, full_name=from_user_name, first_name=from_user_name.split()[0]),
+        from_user=SimpleNamespace(
+            id=from_user_id,
+            full_name=from_user_name,
+            first_name=from_user_name.split()[0],
+            is_bot=from_user_is_bot,
+        ),
         reply_to_message=reply_to_message,
         date=None,
     )
@@ -429,6 +440,21 @@ class _FakeSessionStore:
         self.messages.append((session_id, message, skip_db))
 
 
+def test_bot_authored_messages_are_always_ignored():
+    adapter = _make_adapter(require_mention=False)
+
+    assert adapter._should_process_message(_group_message("hello from another bot", from_user_is_bot=True)) is False
+
+    adapter_requires_mention = _make_adapter(require_mention=True)
+    assert adapter_requires_mention._should_process_message(
+        _group_message(
+            "hi @hermes_bot",
+            from_user_is_bot=True,
+            entities=[_mention_entity("hi @hermes_bot")],
+        )
+    ) is False
+
+
 def test_group_messages_can_require_direct_trigger_via_config():
     adapter = _make_adapter(require_mention=True)
 
@@ -642,6 +668,7 @@ def test_config_bridges_telegram_group_settings(monkeypatch, tmp_path):
     (hermes_home / "config.yaml").write_text(
         "telegram:\n"
         "  require_mention: true\n"
+        "  gateway_restart_notification: false\n"
         "  guest_mode: true\n"
         "  exclusive_bot_mentions: true\n"
         "  observe_unmentioned_group_messages: true\n"
@@ -689,6 +716,7 @@ def test_config_bridges_telegram_group_settings(monkeypatch, tmp_path):
     assert tg_cfg.extra.get("allowed_topics") == [8]
     assert tg_cfg.extra.get("exclusive_bot_mentions") is True
     assert tg_cfg.extra.get("observe_unmentioned_group_messages") is True
+    assert tg_cfg.gateway_restart_notification is False
 
 
 def test_config_bridges_telegram_user_allowlists(monkeypatch, tmp_path):

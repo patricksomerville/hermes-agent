@@ -861,6 +861,9 @@ def load_gateway_config() -> GatewayConfig:
                     bridged["reply_prefix"] = platform_cfg["reply_prefix"]
                 if "reply_in_thread" in platform_cfg:
                     bridged["reply_in_thread"] = platform_cfg["reply_in_thread"]
+                if "gateway_restart_notification" in platform_cfg:
+                    plat_data, _ = _ensure_platform_extra_dict(platforms_data, plat.value)
+                    plat_data["gateway_restart_notification"] = platform_cfg["gateway_restart_notification"]
                 if "require_mention" in platform_cfg:
                     bridged["require_mention"] = platform_cfg["require_mention"]
                 if plat == Platform.TELEGRAM and "allowed_chats" in platform_cfg:

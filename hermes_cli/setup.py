@@ -90,6 +90,7 @@ _DEFAULT_PROVIDER_MODELS = {
         "gemini-2.5-pro",
     ],
     "gemini": [
+        "gemini-3.5-flash",
         "gemini-3.1-pro-preview", "gemini-3-pro-preview",
         "gemini-3-flash-preview", "gemini-3.1-flash-lite-preview",
     ],
