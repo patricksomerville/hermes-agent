@@ -2069,6 +2069,30 @@ def _resolve_api_key_provider() -> Tuple[Optional[OpenAI], Optional[str]]:
     return None, None
 
 
+def _custom_provider_default_headers(base_url: str, provider: str) -> dict:
+    """Endpoint-scoped custom headers; never merge identities sharing a URL.
+
+    Header values can contain credentials, so do not log them. The existing
+    route normalizer preserves scheme, port and path boundaries.
+    """
+    from hermes_cli.config import (
+        get_compatible_custom_providers, get_custom_provider_extra_headers, load_config,
+    )
+    from hermes_cli.runtime_provider import _get_named_custom_provider
+
+    entry = _get_named_custom_provider(provider)
+    if entry is not None:
+        return get_custom_provider_extra_headers(base_url, [entry])
+    config = load_config()
+    # Anonymous custom routes prefer the active named identity when it matches.
+    active = _get_named_custom_provider(str((config.get("model") or {}).get("provider") or ""))
+    if active is not None:
+        from hermes_cli.route_identity import normalize_route_base_url
+        if normalize_route_base_url(active.get("base_url")) == normalize_route_base_url(base_url):
+            return get_custom_provider_extra_headers(base_url, [active])
+    return get_custom_provider_extra_headers(base_url, get_compatible_custom_providers(config))
+
+
 def _endpoint_default_headers(
     base_url: str, provider: str, *, is_vision: bool = False, xai: bool = False,
 ) -> Optional[dict]:
@@ -2090,6 +2114,9 @@ def _endpoint_default_headers(
         headers = dict(hermes_xai_default_headers())
     else:
         headers = _profile_default_headers(provider) or {}
+    # Preserve auxiliary user-header precedence; custom headers override only
+    # provider fingerprints, and remain confined to the matching endpoint.
+    headers.update(_custom_provider_default_headers(base_url, provider))
     return _apply_user_default_headers(headers or None) or None
 
 
@@ -2674,8 +2701,8 @@ def _try_custom_endpoint() -> Tuple[Optional[Any], Optional[str]]:
     logger.debug("Auxiliary client: custom endpoint (%s, api_mode=%s)", model, custom_mode or "chat_completions")
     _clean_base, _dq = _extract_url_query_params(custom_base)
     _extra = {"default_query": _dq} if _dq else {}
-    # User model.default_headers override SDK fingerprint headers (as on the main client) for strict gateways/WAFs.
-    _custom_headers = _apply_user_default_headers(None)
+    # Preserve auxiliary user-header overrides for strict gateways/WAFs.
+    _custom_headers = _endpoint_default_headers(custom_base, "custom")
     if _custom_headers:
         _extra["default_headers"] = _custom_headers
     if custom_mode == "codex_responses":
@@ -4232,7 +4259,7 @@ def _effective_provider_for_client(client: Any, fallback: str) -> str:
 # client (auth, base URL, headers, API format) from (provider, model). Never read auth env vars ad-hoc.
 
 
-def _to_async_client(sync_client, model: str, is_vision: bool = False):
+def _to_async_client(sync_client, model: str, is_vision: bool = False, provider: str = ""):
     """Sync client → async counterpart, preserving Codex routing (``is_vision`` adds the Copilot vision header)."""
     from openai import AsyncOpenAI
     if isinstance(sync_client, _AuxProbeClientStub):
@@ -4263,7 +4290,7 @@ def _to_async_client(sync_client, model: str, is_vision: bool = False):
             inferred = _infer_provider_from_url(sync_base_url) or ""
         except Exception:
             inferred = ""
-        headers = _endpoint_default_headers(sync_base_url, inferred, is_vision=is_vision, xai=True)
+        headers = _endpoint_default_headers(sync_base_url, provider or inferred, is_vision=is_vision, xai=True)
     if headers:
         async_kwargs["default_headers"] = headers
     _apply_required_codex_headers(async_kwargs, access_token=sync_client.api_key, base_url=sync_base_url)
@@ -4438,7 +4465,8 @@ def _wrap_transport(req: _ResolveRequest, client_obj: Any, final_model_str: str,
 def _route_client(req: _ResolveRequest, client_obj: Any, final_model_str: Optional[str]) -> _ResolveResult:
     """Return (client, model), converting to the async wrapper when ``req.async_mode``."""
     if req.async_mode:
-        return _to_async_client(client_obj, final_model_str, is_vision=req.is_vision)
+        return _to_async_client(client_obj, final_model_str, is_vision=req.is_vision,
+                                provider=req.original_provider or req.provider)
     return client_obj, final_model_str
 
 
@@ -4592,11 +4620,11 @@ def _resolve_custom_branch(req: _ResolveRequest) -> _ResolveResult:
     return None, None
 
 
-def _named_custom_openai_wire_client(custom_base: str, custom_key: Any):
+def _named_custom_openai_wire_client(custom_base: str, custom_key: Any, provider: str = ""):
     """Plain OpenAI client on the /v1 equivalent of a named custom entry's base URL."""
     _clean_base, _dq = _extract_url_query_params(_to_openai_base_url(custom_base))
     _extra = {"default_query": _dq} if _dq else {}
-    _headers = _apply_user_default_headers(None)
+    _headers = _endpoint_default_headers(custom_base, provider)
     if _headers:
         _extra["default_headers"] = _headers
     return _create_openai_client(api_key=custom_key, base_url=_clean_base, **_extra)
@@ -4647,10 +4675,10 @@ def _resolve_named_custom_branch(req: _ResolveRequest) -> Optional[_ResolveResul
         except ImportError:
             logger.warning("Named custom provider %r declares api_mode=anthropic_messages but the anthropic SDK "
                            "is not installed — falling back to OpenAI-wire.", provider)
-            return _route_client(req, _named_custom_openai_wire_client(custom_base, custom_key), final_model)
+            return _route_client(req, _named_custom_openai_wire_client(custom_base, custom_key, custom_entry.get("name") or provider), final_model)
         return _route_client(
             req, AnthropicAuxiliaryClient(real_client, final_model, custom_key, custom_base, is_oauth=False), final_model)
-    client = _named_custom_openai_wire_client(custom_base, custom_key)
+    client = _named_custom_openai_wire_client(custom_base, custom_key, custom_entry.get("name") or provider)
     # codex_responses, or auto-detect via _wrap_transport (which reads the task-level api_mode).
     if entry_api_mode == "codex_responses":
         client = CodexAuxiliaryClient(client, final_model)
